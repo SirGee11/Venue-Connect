@@ -2,7 +2,7 @@
 
 Venue Connect is a digital platform designed to connect people searching for event venues with venue owners.
 
-The system allows users to discover venues, view venue information, check availability, make bookings, and interact with venue providers.
+The system allows users to discover venues using AI features, view venue information, check availability, make bookings, and interact with venue providers.
 
 ## Project Structure
 
@@ -54,6 +54,6 @@ tests/          Application and API tests
 
 ## Team
 
-Venue Connect is developed as a group project.
+Venue Connect is developed by Infinity Minds.
 
 Each member is responsible for assigned features and must follow the project's Git workflow.
