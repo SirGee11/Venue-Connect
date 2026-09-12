@@ -1,8 +1,9 @@
 import React from 'react';
 import SearchBar from '../components/SearchBar';
 import VenueCard from '../components/VenueCard';
+import AiVenueFinder from '../components/AiVenueFinder';
 import { CATEGORIES, ZIMBABWE_CITIES } from '../data/mockData';
-import { ShieldCheck, CalendarCheck, Sparkles, Award, ArrowRight, Heart, Zap, Camera, Briefcase, Sun, Users, MapPin, Building2, Utensils, Presentation } from 'lucide-react';
+import { ShieldCheck, CalendarCheck, Sparkles, Award, ArrowRight, Heart, Zap, MapPin, Building2, Utensils, Presentation, Users, Sun, Bot } from 'lucide-react';
 
 export default function Home({ venues, onSelectVenue, navigateTo, searchParams, setSearchParams, onSearchSubmit, userFavorites, onToggleFavorite }) {
   const featuredVenues = venues.filter(v => v.featured || v.rating >= 4.85).slice(0, 6);
@@ -71,6 +72,26 @@ export default function Home({ venues, onSelectVenue, navigateTo, searchParams, 
               }}
             />
           </div>
+        </div>
+      </section>
+
+      {/* Interactive AI Smart Finder Section */}
+      <section style={{ padding: '4rem 0', background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border-color)' }}>
+        <div className="container">
+          <div className="section-header">
+            <span className="badge badge-gold" style={{ marginBottom: '0.5rem' }}>
+              <Bot size={13} /> AI Intelligence Matcher
+            </span>
+            <h2>AI Event Venue Finder</h2>
+            <p>Enter your location, event type, guest count, and facilities to generate an AI recommendation with natural rationale</p>
+          </div>
+
+          <AiVenueFinder
+            venues={venues}
+            onSelectVenue={onSelectVenue}
+            userFavorites={userFavorites}
+            onToggleFavorite={onToggleFavorite}
+          />
         </div>
       </section>
 
