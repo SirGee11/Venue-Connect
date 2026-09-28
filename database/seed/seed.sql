@@ -1,0 +1,2 @@
+INSERT INTO users (name, email, password) VALUES ('Admin', 'admin@venue.com', 'password123');
+INSERT INTO venues (name, location, capacity, price_per_day) VALUES ('School Campus', 'Bulawayo CBD', 200, 500.00);
