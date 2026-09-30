@@ -25,21 +25,18 @@ export default function Home({ venues, onSelectVenue, navigateTo, searchParams, 
       {/* Hero Section */}
       <section className="hero-section" style={{
         position: 'relative',
-        padding: '5rem 0 4rem 0',
+        padding: '4.5rem 0 4rem 0',
         background: 'radial-gradient(ellipse at top, #1e293b 0%, #090d16 75%)',
         borderBottom: '1px solid var(--border-color)',
         overflow: 'hidden'
       }}>
         <div className="container" style={{ position: 'relative', zIndex: 2 }}>
           <div style={{ textAlign: 'center', maxWidth: '820px', margin: '0 auto 2.5rem auto' }}>
-            <span className="badge badge-gold" style={{ marginBottom: '1rem', padding: '0.4rem 1rem' }}>
-              <Sparkles size={14} /> Designed for the Zimbabwean Market
-            </span>
             <h1 style={{ fontSize: '3.25rem', fontWeight: 800, marginBottom: '1.25rem', letterSpacing: '-0.5px' }}>
               Find the Perfect Venue for Your Next <span className="gold-text">Event in Zimbabwe</span>
             </h1>
             <p style={{ fontSize: '1.15rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-              Discover and reserve top wedding gardens, conference centres, church halls, and lodges with solar backup power and verified US$ pricing across Zimbabwe.
+              Discover and reserve top wedding gardens, conference centres, church halls, and lodges with solar backup power and verified pricing across Zimbabwe.
             </p>
 
             {/* Quick City Buttons */}
@@ -79,9 +76,7 @@ export default function Home({ venues, onSelectVenue, navigateTo, searchParams, 
       <section style={{ padding: '4rem 0', background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border-color)' }}>
         <div className="container">
           <div className="section-header">
-            <span className="badge badge-gold" style={{ marginBottom: '0.5rem' }}>
-              <Bot size={13} /> AI Intelligence Matcher
-            </span>
+
             <h2>AI Event Venue Finder</h2>
             <p>Enter your location, event type, guest count, and facilities to generate an AI recommendation with natural rationale</p>
           </div>

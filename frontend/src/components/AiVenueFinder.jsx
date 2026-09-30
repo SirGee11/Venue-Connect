@@ -116,7 +116,7 @@ export default function AiVenueFinder({ venues, onSelectVenue, userFavorites, on
         </div>
 
         <span className="badge badge-gold" style={{ padding: '0.4rem 0.9rem' }}>
-          <Sparkles size={13} /> Powered by Natural AI Scoring
+          Powered by Natural AI Scoring
         </span>
       </div>
 
@@ -221,7 +221,7 @@ export default function AiVenueFinder({ venues, onSelectVenue, userFavorites, on
         onClick={handleRunAiRecommendation}
         disabled={isSearching}
       >
-        <Sparkles size={18} /> {isSearching ? 'Calculating AI Recommendation...' : 'Generate AI Recommendation Match'}
+        {isSearching ? 'Calculating AI Recommendation...' : 'Generate AI Recommendation Match'}
       </button>
 
       {/* AI Recommendation Result Card Output */}
