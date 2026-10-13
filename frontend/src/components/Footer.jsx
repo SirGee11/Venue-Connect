@@ -11,19 +11,8 @@ export default function Footer({ navigateTo }) {
           {/* Brand Info */}
           <div className="footer-brand">
             <div className="footer-brand-logo">
-              <div className="brand-icon" style={{ 
-                width: '38px',
-                height: '38px',
-                borderRadius: '10px',
-                overflow: 'hidden',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                border: '1px solid rgba(245, 158, 11, 0.4)',
-                boxShadow: '0 0 10px rgba(245, 158, 11, 0.3)',
-                background: '#090d16'
-              }}>
-                <img src="/infinity-logo.jpg" alt="VenueConnect Logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              <div className="brand-icon" style={{ background: 'var(--accent-gold-gradient)', color: '#090d16' }}>
+                <Building2 size={22} />
               </div>
               <span>Venue<span className="gold-text">Connect</span></span>
             </div>
