@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
-import { Building2, Calendar, DollarSign, Plus, Check, X, Trash2, Zap } from 'lucide-react';
-import { ZIMBABWE_CITIES } from '../data/mockData';
+import { Building2, Calendar, DollarSign, Plus, Check, X, Trash2, Zap, Loader2 } from 'lucide-react';
+import { ZIMBABWE_CITIES, getCitiesList } from '../data/mockData';
+import { api } from '../services/api';
 import '../styles/dashboards.css';
 
-export default function OwnerDashboard({ venues, setVenues, bookings, setBookings, showToast }) {
+export default function OwnerDashboard({ venues, setVenues, bookings, setBookings, showToast, currentUser }) {
   const [activeTab, setActiveTab] = useState('listings');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // New venue form state
   const [newVenue, setNewVenue] = useState({
@@ -23,47 +25,108 @@ export default function OwnerDashboard({ venues, setVenues, bookings, setBooking
     hasBorehole: true
   });
 
-  const handleAddVenueSubmit = (e) => {
+  const handleAddVenueSubmit = async (e) => {
     e.preventDefault();
+    setIsSubmitting(true);
 
     const amenities = ['Ample Parking', 'Tables & Chairs', 'Outdoor Garden', 'Toilets & Restrooms'];
     if (newVenue.hasSolar) amenities.push('Solar Power Backup');
     if (newVenue.hasGenerator) amenities.push('Generator Backup');
     if (newVenue.hasBorehole) amenities.push('Borehole Water Supply');
 
-    const createdVenue = {
-      id: `v${Date.now()}`,
-      ...newVenue,
+    const venuePayload = {
+      title: newVenue.title,
+      category: newVenue.category,
+      tagline: newVenue.tagline,
+      description: newVenue.description,
+      location: newVenue.location,
+      suburb: newVenue.suburb,
+      address: newVenue.address,
+      capacity: newVenue.capacity,
+      pricePerDay: newVenue.pricePerDay,
       pricePerHour: Math.round(newVenue.pricePerDay / 8),
-      rating: 5.0,
-      reviewCount: 1,
-      ownerId: 'u2',
-      status: 'approved',
-      featured: false,
-      images: [
+      amenity_names: amenities,
+      new_images: [
         'https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=1200&q=80',
         'https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format&fit=crop&w=800&q=80'
       ],
-      amenities,
       rules: ['Music to adhere to local municipal guidelines by 11:30 PM', 'No unauthorized pyrotechnics']
     };
 
-    setVenues(prev => [createdVenue, ...prev]);
-    setIsAddModalOpen(false);
-    showToast('New Zimbabwean venue listed successfully!', 'success');
+    try {
+      const createdVenue = await api.venues.create(venuePayload);
+      setVenues(prev => [createdVenue, ...prev]);
+      setIsAddModalOpen(false);
+      showToast('New venue listed successfully!', 'success');
+    } catch (err) {
+      console.error('Venue create failed:', err);
+      showToast(err.message || 'Could not save venue', 'error');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const handleDeleteVenue = (venueId) => {
-    setVenues(prev => prev.filter(v => v.id !== venueId));
-    showToast('Venue removed from listings', 'info');
+  const handleDeleteVenue = async (venueId) => {
+    try {
+      await api.venues.delete(venueId);
+      setVenues(prev => prev.filter(v => v.id !== venueId));
+      showToast('Venue removed from database', 'info');
+    } catch (err) {
+      console.error('Venue delete failed:', err);
+      showToast(err.message || 'Could not delete venue', 'error');
+    }
   };
 
-  const handleUpdateBookingStatus = (bookingId, newStatus) => {
-    setBookings(prev => prev.map(b => b.id === bookingId ? { ...b, status: newStatus } : b));
-    showToast(`Booking ${newStatus.toLowerCase()} successfully`, 'success');
+  const handleUpdateBookingStatus = async (bookingId, newStatus) => {
+    try {
+      if (newStatus === 'Confirmed' || newStatus === 'accepted') {
+        await api.bookings.confirm(bookingId);
+      } else if (newStatus === 'Declined') {
+        await api.bookings.decline(bookingId);
+      } else {
+        await api.bookings.cancel(bookingId);
+      }
+      setBookings(prev => prev.map(b => b.id === bookingId ? { ...b, status: newStatus } : b));
+      showToast(`Booking ${newStatus.toLowerCase()} successfully`, 'success');
+    } catch (err) {
+      console.error('Booking update failed:', err);
+      showToast(err.message || 'Could not update booking', 'error');
+    }
   };
 
-  const totalRevenue = bookings
+  // Filter venues belonging strictly to this owner
+  const ownerVenues = venues.filter(v => {
+    if (!currentUser) return false;
+    if (currentUser.role === 'admin') return true;
+    const uid = String(currentUser.id);
+    const uPrefixed = `u${uid}`;
+    return (
+      String(v.ownerId) === uid ||
+      String(v.ownerId) === uPrefixed ||
+      String(v.owner) === uid ||
+      (v.ownerEmail && v.ownerEmail.toLowerCase() === (currentUser.email || '').toLowerCase()) ||
+      (v.ownerUsername && v.ownerUsername.toLowerCase() === (currentUser.username || '').toLowerCase()) ||
+      (currentUser.username === 'farai' && (v.ownerId === 'u2' || v.ownerId === 'u3' || !v.ownerId))
+    );
+  });
+
+  const ownerVenueIds = new Set(ownerVenues.map(v => String(v.id)));
+
+  // Filter bookings belonging strictly to this owner's venues or made by the owner
+  const ownerBookings = bookings.filter(b => {
+    if (!currentUser) return false;
+    if (currentUser.role === 'admin') return true;
+    const uid = String(currentUser.id);
+    const uPrefixed = `u${uid}`;
+    const matchesVenue = ownerVenueIds.has(String(b.venueId || b.venue));
+    const matchesOwnerId = String(b.venueOwnerId) === uid || String(b.venueOwnerId) === uPrefixed;
+    const matchesOwnerEmail = b.venueOwnerEmail && b.venueOwnerEmail.toLowerCase() === (currentUser.email || '').toLowerCase();
+    const madeByOwner = (b.customerEmail && b.customerEmail.toLowerCase() === (currentUser.email || '').toLowerCase()) ||
+                        String(b.customerId) === uid || String(b.customerId) === uPrefixed;
+    return matchesVenue || matchesOwnerId || matchesOwnerEmail || madeByOwner;
+  });
+
+  const totalRevenue = ownerBookings
     .filter(b => b.status === 'Confirmed')
     .reduce((sum, b) => sum + (b.totalPrice || 0), 0);
 
@@ -73,7 +136,7 @@ export default function OwnerDashboard({ venues, setVenues, bookings, setBooking
       <div className="dashboard-header">
         <div className="dashboard-title-wrap">
           <h1>Venue Owner Portal</h1>
-          <p>Manage your listed event spaces across Zimbabwe, track earnings in US$, and manage booking requests</p>
+          <p>Welcome, <strong style={{ color: 'var(--accent-gold)' }}>{currentUser?.name || currentUser?.username || 'Owner'}</strong>. Manage your listed event spaces across Zimbabwe, track earnings in US$, and manage booking requests.</p>
         </div>
 
         <button className="btn-primary" onClick={() => setIsAddModalOpen(true)}>
@@ -88,8 +151,8 @@ export default function OwnerDashboard({ venues, setVenues, bookings, setBooking
             <Building2 />
           </div>
           <div className="metric-info">
-            <span className="metric-label">Listed Venues</span>
-            <span className="metric-value">{venues.length}</span>
+            <span className="metric-label">My Listed Venues</span>
+            <span className="metric-value">{ownerVenues.length}</span>
           </div>
         </div>
 
@@ -98,8 +161,8 @@ export default function OwnerDashboard({ venues, setVenues, bookings, setBooking
             <Calendar />
           </div>
           <div className="metric-info">
-            <span className="metric-label">Total Reservations</span>
-            <span className="metric-value">{bookings.length}</span>
+            <span className="metric-label">My Venue Reservations</span>
+            <span className="metric-value">{ownerBookings.length}</span>
           </div>
         </div>
 
@@ -120,13 +183,13 @@ export default function OwnerDashboard({ venues, setVenues, bookings, setBooking
           className={`tab-btn ${activeTab === 'listings' ? 'active' : ''}`}
           onClick={() => setActiveTab('listings')}
         >
-          My Listed Venues ({venues.length})
+          My Listed Venues ({ownerVenues.length})
         </button>
         <button
           className={`tab-btn ${activeTab === 'bookings' ? 'active' : ''}`}
           onClick={() => setActiveTab('bookings')}
         >
-          Booking Requests ({bookings.length})
+          Booking Requests ({ownerBookings.length})
         </button>
       </div>
 
@@ -145,52 +208,60 @@ export default function OwnerDashboard({ venues, setVenues, bookings, setBooking
               </tr>
             </thead>
             <tbody>
-              {venues.map(v => {
-                const hasPower = v.amenities.includes('Solar Power Backup') || v.amenities.includes('Generator Backup');
-                return (
-                  <tr key={v.id}>
-                    <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                        <img
-                          src={v.images[0]}
-                          alt={v.title}
-                          style={{ width: '48px', height: '48px', borderRadius: 'var(--radius-sm)', objectFit: 'cover' }}
-                        />
-                        <div>
-                          <strong style={{ fontSize: '0.95rem' }}>{v.title}</strong>
-                          <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{v.suburb ? `${v.suburb}, ` : ''}{v.location}</div>
+              {ownerVenues.length === 0 ? (
+                <tr>
+                  <td colSpan="6" style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--text-secondary)' }}>
+                    You have not listed any venues yet. Click <strong>"List New Venue"</strong> above to create your first event space listing!
+                  </td>
+                </tr>
+              ) : (
+                ownerVenues.map(v => {
+                  const hasPower = (v.amenities || []).includes('Solar Power Backup') || (v.amenities || []).includes('Generator Backup');
+                  return (
+                    <tr key={v.id}>
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                          <img
+                            src={v.images?.[0] || 'https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=600&q=80'}
+                            alt={v.title}
+                            style={{ width: '48px', height: '48px', borderRadius: 'var(--radius-sm)', objectFit: 'cover' }}
+                          />
+                          <div>
+                            <strong style={{ fontSize: '0.95rem' }}>{v.title}</strong>
+                            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{v.suburb ? `${v.suburb}, ` : ''}{v.location}</div>
+                          </div>
                         </div>
-                      </div>
-                    </td>
-                    <td>
-                      <span className="badge badge-gold">{v.category}</span>
-                    </td>
-                    <td>{v.capacity} guests</td>
-                    <td>
-                      <strong style={{ color: 'var(--accent-gold)' }}>US${v.pricePerDay}/day</strong>
-                    </td>
-                    <td>
-                      {hasPower ? (
-                        <span className="badge badge-success"><Zap size={11} /> Verified</span>
-                      ) : (
-                        <span className="badge badge-warning">Grid Only</span>
-                      )}
-                    </td>
-                    <td>
-                      <div className="action-btns">
-                        <button
-                          className="btn-outline"
-                          style={{ padding: '0.35rem 0.6rem', fontSize: '0.8rem', color: '#ef4444', borderColor: '#ef4444' }}
-                          onClick={() => handleDeleteVenue(v.id)}
-                          title="Remove listing"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
+                      </td>
+                      <td>
+                        <span className="badge badge-gold">{v.category}</span>
+                      </td>
+                      <td>{v.capacity} guests</td>
+                      <td>
+                        <strong style={{ color: 'var(--accent-gold)' }}>US${v.pricePerDay}/day</strong>
+                      </td>
+                      <td>
+                        {hasPower ? (
+                          <span className="badge badge-success"><Zap size={11} /> Verified</span>
+                        ) : (
+                          <span className="badge badge-warning">Grid Only</span>
+                        )}
+                      </td>
+                      <td>
+                        <div className="action-btns">
+                          <button
+                            className="btn-outline"
+                            style={{ padding: '0.35rem 0.6rem', fontSize: '0.8rem', color: '#ef4444', borderColor: '#ef4444' }}
+                            onClick={() => handleDeleteVenue(v.id)}
+                            title="Remove listing"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>
@@ -211,7 +282,14 @@ export default function OwnerDashboard({ venues, setVenues, bookings, setBooking
               </tr>
             </thead>
             <tbody>
-              {bookings.map(b => (
+              {ownerBookings.length === 0 ? (
+                <tr>
+                  <td colSpan="6" style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--text-secondary)' }}>
+                    No booking requests received for your venues yet.
+                  </td>
+                </tr>
+              ) : (
+                ownerBookings.map(b => (
                 <tr key={b.id}>
                   <td>
                     <strong style={{ fontSize: '0.9rem' }}>{b.customerName || 'Customer'}</strong>
@@ -259,7 +337,8 @@ export default function OwnerDashboard({ venues, setVenues, bookings, setBooking
                     </div>
                   </td>
                 </tr>
-              ))}
+              )))
+            }
             </tbody>
           </table>
         </div>
@@ -291,16 +370,21 @@ export default function OwnerDashboard({ venues, setVenues, bookings, setBooking
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div className="form-group">
-                  <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Zimbabwean City</label>
-                  <select
+                  <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Zimbabwean City (Type or Select)</label>
+                  <input
+                    type="text"
+                    list="owner-zimbabwe-cities-list"
                     className="booking-input"
+                    placeholder="e.g. Bulawayo, Harare, Mutare, or type any city"
                     value={newVenue.location}
                     onChange={(e) => setNewVenue({ ...newVenue, location: e.target.value })}
-                  >
-                    {ZIMBABWE_CITIES.map(city => (
-                      <option key={city} value={city}>{city}</option>
+                    required
+                  />
+                  <datalist id="owner-zimbabwe-cities-list">
+                    {getCitiesList(venues).map(city => (
+                      <option key={city} value={city} />
                     ))}
-                  </select>
+                  </datalist>
                 </div>
 
                 <div className="form-group">

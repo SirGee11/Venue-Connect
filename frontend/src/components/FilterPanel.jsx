@@ -1,12 +1,14 @@
 import React from 'react';
 import { Filter, RotateCcw, MapPin, Zap } from 'lucide-react';
-import { ZIMBABWE_CITIES, CATEGORIES, AMENITIES_LIST } from '../data/mockData';
+import { ZIMBABWE_CITIES, CATEGORIES, AMENITIES_LIST, getCitiesList } from '../data/mockData';
 
-export default function FilterPanel({ filters, setFilters, resetFilters }) {
+export default function FilterPanel({ filters, setFilters, resetFilters, venues = [] }) {
+  const cities = getCitiesList(venues);
+
   const handleCityToggle = (city) => {
     setFilters(prev => ({
       ...prev,
-      city: prev.city === city ? '' : city
+      city: prev.city?.toLowerCase() === city.toLowerCase() ? '' : city
     }));
   };
 
@@ -41,18 +43,45 @@ export default function FilterPanel({ filters, setFilters, resetFilters }) {
       {/* Zimbabwean City Filter */}
       <div className="filter-group">
         <label className="filter-group-label">Zimbabwean City</label>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
-          {ZIMBABWE_CITIES.map(city => (
-            <button
-              key={city}
-              type="button"
-              className={`badge ${filters.city === city ? 'badge-gold' : 'badge-blue'}`}
-              style={{ cursor: 'pointer', border: filters.city === city ? '1px solid var(--accent-gold)' : '1px solid var(--border-color)' }}
-              onClick={() => handleCityToggle(city)}
-            >
-              <MapPin size={12} /> {city}
-            </button>
-          ))}
+        <div style={{ marginBottom: '0.6rem' }}>
+          <input
+            type="text"
+            list="filter-cities-list"
+            placeholder="Type any city (e.g. Bulawayo, Harare...)"
+            value={filters.city || ''}
+            onChange={(e) => setFilters(prev => ({ ...prev, city: e.target.value }))}
+            style={{
+              width: '100%',
+              padding: '0.5rem 0.75rem',
+              borderRadius: 'var(--radius-sm)',
+              background: 'var(--bg-secondary)',
+              border: '1px solid var(--border-color)',
+              color: 'var(--text-primary)',
+              fontSize: '0.85rem',
+              outline: 'none'
+            }}
+          />
+          <datalist id="filter-cities-list">
+            {cities.map(city => (
+              <option key={city} value={city} />
+            ))}
+          </datalist>
+        </div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', maxHeight: '110px', overflowY: 'auto' }}>
+          {cities.slice(0, 10).map(city => {
+            const isSelected = filters.city?.toLowerCase() === city.toLowerCase();
+            return (
+              <button
+                key={city}
+                type="button"
+                className={`badge ${isSelected ? 'badge-gold' : 'badge-blue'}`}
+                style={{ cursor: 'pointer', border: isSelected ? '1px solid var(--accent-gold)' : '1px solid var(--border-color)' }}
+                onClick={() => handleCityToggle(city)}
+              >
+                <MapPin size={12} /> {city}
+              </button>
+            );
+          })}
         </div>
       </div>
 

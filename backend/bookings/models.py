@@ -4,46 +4,50 @@ from django.conf import settings
 
 class Booking(models.Model):
     STATUS_CHOICES = [
-        ('pending', 'Pending'),
-        ('accepted', 'Accepted'),
-        ('declined', 'Declined'),
-        ('cancelled', 'Cancelled'),
-        ('completed', 'Completed'),
+        ('Pending', 'Pending'),
+        ('Confirmed', 'Confirmed'),
+        ('Declined', 'Declined'),
+        ('Cancelled', 'Cancelled'),
+        ('Completed', 'Completed'),
     ]
 
-    # Foreign Keys matching schema (client_id, venue_id)
     client = models.ForeignKey(
         settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
         related_name='bookings',
-        db_column='client_id'
     )
     venue = models.ForeignKey(
         'venues.Venue',
         on_delete=models.CASCADE,
         related_name='bookings',
-        db_column='venue_id'
     )
 
-    # Date, Time & Details
-    start_time = models.DateTimeField()
-    end_time = models.DateTimeField()
-    event_type = models.CharField(max_length=100, blank=True, null=True)
-    guest_count = models.IntegerField(blank=True, null=True)
-    notes = models.TextField(blank=True, null=True)
+    customer_name = models.CharField(max_length=150, blank=True, default='')
+    customer_email = models.EmailField(blank=True, default='')
+    customer_phone = models.CharField(max_length=50, blank=True, default='')
 
-    # Status & Timestamps
+    event_date = models.DateField(null=True, blank=True)
+    start_time = models.CharField(max_length=50, blank=True, default='')
+    end_time = models.CharField(max_length=50, blank=True, default='')
+    event_type = models.CharField(max_length=100, blank=True, default='')
+    guest_count = models.IntegerField(null=True, blank=True)
+    total_price = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    notes = models.TextField(blank=True, default='')
+
     status = models.CharField(
         max_length=20,
         choices=STATUS_CHOICES,
-        default='pending'
+        default='Pending'
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         db_table = 'bookings'
-        ordering = ['-start_time']
+        ordering = ['-created_at']
 
     def __str__(self):
-        return f"Booking {self.id} - {self.event_type} (Client: {self.client_id})"
+        venue_name = self.venue.name if self.venue else "Unknown Venue"
+        return f"Booking #{self.id} - {venue_name} ({self.customer_name or 'Guest'})"

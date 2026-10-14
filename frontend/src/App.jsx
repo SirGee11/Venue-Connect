@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import BookingModal from './components/BookingModal';
@@ -14,6 +14,7 @@ import OwnerDashboard from './pages/OwnerDashboard';
 import AdminDashboard from './pages/AdminDashboard';
 
 import { INITIAL_VENUES, INITIAL_BOOKINGS } from './data/mockData';
+import { api } from './services/api';
 
 import './styles/global.css';
 
@@ -24,6 +25,7 @@ export default function App() {
   const [currentRole, setRole] = useState('customer');
   const [currentPage, setCurrentPage] = useState('home');
   const [selectedVenueId, setSelectedVenueId] = useState('v1');
+  const [currentUser, setCurrentUser] = useState(null);
 
   // Search parameters state across home and venues page
   const [searchParams, setSearchParams] = useState({
@@ -41,7 +43,106 @@ export default function App() {
     setTimeout(() => setToast({ message: '', type: 'success' }), 4000);
   };
 
-  const navigateTo = (page) => {
+  // Synchronize with DRF Backend on mount and auth state change
+  const fetchBackendData = async () => {
+    try {
+      const [venuesData, bookingsData] = await Promise.all([
+        api.venues.getAll(),
+        api.bookings.getAll()
+      ]);
+      if (Array.isArray(venuesData) && venuesData.length > 0) {
+        setVenues(venuesData);
+        if (!selectedVenueId || selectedVenueId === 'v1') {
+          setSelectedVenueId(venuesData[0].id);
+        }
+      }
+      if (Array.isArray(bookingsData)) {
+        setBookings(bookingsData);
+      }
+    } catch (err) {
+      console.warn('Backend currently using fallback state:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchBackendData();
+
+    // Check logged in user
+    const savedUser = api.auth.getCurrentUser();
+    if (savedUser) {
+      // Confirm the saved token is still valid; request() clears it on 401
+      api.auth.getMe()
+        .then(() => {
+          setCurrentUser(savedUser);
+          if (savedUser.role) setRole(savedUser.role);
+        })
+        .catch(() => {
+          setCurrentUser(null);
+        });
+    }
+  }, []);
+
+  // When currentUser changes (e.g. login/logout), refresh user-scoped bookings
+  useEffect(() => {
+    if (currentUser) {
+      fetchBackendData();
+    }
+  }, [currentUser]);
+
+  const handleLogout = () => {
+    api.auth.logout();
+    setCurrentUser(null);
+    setRole('customer');
+    setCurrentPage('home');
+    setBookings([]);
+    showToast('You have been logged out.', 'info');
+  };
+
+  const navigateTo = (page, userOverride) => {
+    // Login/Register pass the new user directly, because React state
+    // (currentUser) has not updated yet at that moment.
+    const user = userOverride ?? currentUser;
+
+    // Role-based Access Control Gates
+    if (page === 'customer-dashboard') {
+      if (!user) {
+        showToast('Please sign in to access your customer bookings', 'info');
+        setCurrentPage('login');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
+    }
+
+    if (page === 'owner-dashboard') {
+      if (!user) {
+        showToast('Please sign in with a Venue Owner account to access the Owner Portal', 'error');
+        setCurrentPage('login');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
+      if (user.role !== 'owner' && user.role !== 'admin') {
+        showToast('Access Denied: Only registered Venue Owners can access the Owner Portal', 'error');
+        setCurrentPage('customer-dashboard');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
+    }
+
+    if (page === 'admin-dashboard') {
+      if (!user) {
+        showToast('Administrator login required', 'error');
+        setCurrentPage('login');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
+      if (user.role !== 'admin') {
+        showToast('Access Denied: Administrator privileges required', 'error');
+        setCurrentPage('home');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
+    }
+
     setCurrentPage(page);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -61,44 +162,52 @@ export default function App() {
   };
 
   const handleInitiateBooking = (details) => {
+    if (!currentUser) {
+      showToast('Please sign in to make a booking', 'info');
+      navigateTo('login');
+      return;
+    }
     setActiveBookingModal(details);
   };
 
-  const handleConfirmBooking = (confirmedData) => {
-    const newBooking = {
-      id: `b${Date.now()}`,
-      venueId: confirmedData.venue.id,
-      venueTitle: confirmedData.venue.title,
-      venueImage: confirmedData.venue.images[0],
-      location: confirmedData.venue.location,
-      customerId: 'u1',
-      customerName: confirmedData.customerName,
-      customerEmail: confirmedData.customerEmail,
-      eventDate: confirmedData.eventDate,
-      startTime: confirmedData.startTime,
-      endTime: confirmedData.endTime,
-      guestCount: confirmedData.guestCount,
-      eventType: confirmedData.eventType,
-      totalPrice: confirmedData.grandTotal,
-      status: 'Pending',
-      createdAt: new Date().toISOString().split('T')[0]
-    };
+  const handleConfirmBooking = async (confirmedData) => {
+    try {
+      const payload = {
+        venueId: confirmedData.venue.id,
+        customerName: confirmedData.customerName,
+        customerEmail: confirmedData.customerEmail,
+        customerPhone: confirmedData.customerPhone,
+        eventDate: confirmedData.eventDate,
+        startTime: confirmedData.startTime,
+        endTime: confirmedData.endTime,
+        guestCount: confirmedData.guestCount,
+        eventType: confirmedData.eventType,
+        grandTotal: confirmedData.grandTotal,
+        specialRequests: confirmedData.specialRequests,
+        customerId: currentUser ? currentUser.id : undefined,
+        venueOwnerId: confirmedData.venue.ownerId || (confirmedData.venue.owner ? `u${confirmedData.venue.owner}` : undefined),
+        venueOwnerEmail: confirmedData.venue.ownerEmail
+      };
 
-    setBookings(prev => [newBooking, ...prev]);
-    setActiveBookingModal(null);
-    showToast('Booking request submitted! View details in your customer portal.', 'success');
-    navigateTo('customer-dashboard');
+      const backendBooking = await api.bookings.create(payload);
+      setBookings(prev => [backendBooking, ...prev]);
+      setActiveBookingModal(null);
+      showToast('Booking request submitted!', 'success');
+      navigateTo('customer-dashboard');
+    } catch (err) {
+      console.error('Failed to create booking:', err);
+      showToast(err.message || 'Booking failed. Please try again.', 'error');
+    }
   };
 
   return (
     <div className="app-root">
       {/* Top Header Navigation */}
       <Navbar
-        currentRole={currentRole}
-        setRole={setRole}
+        currentUser={currentUser}
+        onLogout={handleLogout}
         currentPage={currentPage}
         navigateTo={navigateTo}
-        userFavorites={userFavorites}
       />
 
       {/* Main Dynamic View */}
@@ -143,6 +252,7 @@ export default function App() {
           <Login
             navigateTo={navigateTo}
             setRole={setRole}
+            setCurrentUser={setCurrentUser}
             showToast={showToast}
           />
         )}
@@ -151,40 +261,91 @@ export default function App() {
           <Register
             navigateTo={navigateTo}
             setRole={setRole}
+            setCurrentUser={setCurrentUser}
             showToast={showToast}
           />
         )}
 
         {currentPage === 'customer-dashboard' && (
-          <CustomerDashboard
-            bookings={bookings}
-            setBookings={setBookings}
-            venues={venues}
-            userFavorites={userFavorites}
-            onToggleFavorite={handleToggleFavorite}
-            onSelectVenue={handleSelectVenue}
-            navigateTo={navigateTo}
-            showToast={showToast}
-          />
+          currentUser ? (
+            <CustomerDashboard
+              bookings={bookings}
+              setBookings={setBookings}
+              venues={venues}
+              userFavorites={userFavorites}
+              onToggleFavorite={handleToggleFavorite}
+              onSelectVenue={handleSelectVenue}
+              navigateTo={navigateTo}
+              showToast={showToast}
+              currentUser={currentUser}
+            />
+          ) : (
+            <div className="container" style={{ padding: '5rem 1rem', textAlign: 'center' }}>
+              <div style={{ maxWidth: '480px', margin: '0 auto', background: 'var(--bg-card)', padding: '2.5rem', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-color)' }}>
+                <h2 style={{ marginBottom: '1rem' }}>Account Login Required</h2>
+                <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem', lineHeight: 1.6 }}>
+                  Please sign in to view your Zimbabwean venue reservations and customer bookings.
+                </p>
+                <button className="btn-primary" onClick={() => navigateTo('login')}>
+                  Sign In to Account
+                </button>
+              </div>
+            </div>
+          )
         )}
 
         {currentPage === 'owner-dashboard' && (
-          <OwnerDashboard
-            venues={venues}
-            setVenues={setVenues}
-            bookings={bookings}
-            setBookings={setBookings}
-            showToast={showToast}
-          />
+          currentUser && (currentUser.role === 'owner' || currentUser.role === 'admin') ? (
+            <OwnerDashboard
+              venues={venues}
+              setVenues={setVenues}
+              bookings={bookings}
+              setBookings={setBookings}
+              showToast={showToast}
+              currentUser={currentUser}
+            />
+          ) : (
+            <div className="container" style={{ padding: '5rem 1rem', textAlign: 'center' }}>
+              <div style={{ maxWidth: '520px', margin: '0 auto', background: 'var(--bg-card)', padding: '2.5rem', borderRadius: 'var(--radius-lg)', border: '1px solid rgba(239, 68, 68, 0.3)' }}>
+                <h2 style={{ color: '#ef4444', marginBottom: '1rem' }}>Venue Owner Access Restricted</h2>
+                <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem', lineHeight: 1.6 }}>
+                  Only registered Venue Owners have authorization to list venues and manage reservations.
+                </p>
+                <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center' }}>
+                  <button className="btn-primary" onClick={() => navigateTo('login')}>
+                    Sign In as Owner
+                  </button>
+                  <button className="btn-secondary" onClick={() => navigateTo('home')}>
+                    Return Home
+                  </button>
+                </div>
+              </div>
+            </div>
+          )
         )}
 
         {currentPage === 'admin-dashboard' && (
-          <AdminDashboard
-            venues={venues}
-            setVenues={setVenues}
-            bookings={bookings}
-            showToast={showToast}
-          />
+          currentUser && currentUser.role === 'admin' ? (
+            <AdminDashboard
+              venues={venues}
+              setVenues={setVenues}
+              bookings={bookings}
+              showToast={showToast}
+              currentUser={currentUser}
+            />
+          ) : (
+            <div className="container" style={{ padding: '5rem 1rem', textAlign: 'center' }}>
+              <div style={{ maxWidth: '520px', margin: '0 auto', background: 'var(--bg-card)', padding: '2.5rem', borderRadius: 'var(--radius-lg)', border: '1px solid rgba(239, 68, 68, 0.3)' }}>
+                <h2 style={{ color: '#ef4444', marginBottom: '1rem' }}>Administrator Portal Restricted</h2>
+                <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem', lineHeight: 1.6 }}>
+                  Administrator credentials are required to view the system administration console.
+                </p>
+                <button className="btn-primary" onClick={() => navigateTo('login')}>
+                  Sign In as Admin
+                </button>
+              </div>
+            </div>
+          )
         )}
       </main>
 
@@ -192,6 +353,7 @@ export default function App() {
       {activeBookingModal && (
         <BookingModal
           bookingDetails={activeBookingModal}
+          currentUser={currentUser}
           onClose={() => setActiveBookingModal(null)}
           onConfirmBooking={handleConfirmBooking}
         />

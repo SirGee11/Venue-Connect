@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { X, CheckCircle2, Calendar, Clock, Users, DollarSign, Phone, Mail } from 'lucide-react';
 
-export default function BookingModal({ bookingDetails, onClose, onConfirmBooking }) {
-  const [contactName, setContactName] = useState('Tendai Moyo');
-  const [contactEmail, setContactEmail] = useState('tendai.moyo@connect.co.zw');
-  const [contactPhone, setContactPhone] = useState('+263 77 123 4567');
+export default function BookingModal({ bookingDetails, onClose, onConfirmBooking, currentUser }) {
+  const [contactName, setContactName] = useState(currentUser?.name || '');
+  const [contactEmail, setContactEmail] = useState(currentUser?.email || '');
+  const [contactPhone, setContactPhone] = useState(currentUser?.phone || '');
   const [specialRequests, setSpecialRequests] = useState('');
 
   if (!bookingDetails) return null;

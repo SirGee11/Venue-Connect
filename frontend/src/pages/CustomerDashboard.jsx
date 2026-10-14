@@ -1,16 +1,32 @@
 import React, { useState } from 'react';
 import VenueCard from '../components/VenueCard';
 import { Calendar, CheckCircle, Heart, ArrowRight } from 'lucide-react';
+import { api } from '../services/api';
 import '../styles/dashboards.css';
 
-export default function CustomerDashboard({ bookings, setBookings, venues, userFavorites, onToggleFavorite, onSelectVenue, navigateTo, showToast }) {
+export default function CustomerDashboard({ bookings, setBookings, venues, userFavorites, onToggleFavorite, onSelectVenue, navigateTo, showToast, currentUser }) {
   const [activeTab, setActiveTab] = useState('bookings');
 
-  const customerBookings = bookings;
+  const customerBookings = currentUser ? bookings.filter(b => {
+    if (currentUser.role === 'admin') return true;
+    const uid = String(currentUser.id);
+    const uPrefixed = `u${uid}`;
+    const matchesEmail = b.customerEmail && b.customerEmail.toLowerCase() === (currentUser.email || '').toLowerCase();
+    const matchesCustomer = String(b.customerId) === uid || String(b.customerId) === uPrefixed || String(b.clientId) === uid;
+    const matchesDemo = currentUser.username === 'tendai' && (b.customerId === 'u1' || (b.customerName || '').toLowerCase().includes('tendai'));
+    return matchesEmail || matchesCustomer || matchesDemo;
+  }) : [];
 
-  const handleCancelBooking = (bookingId) => {
-    setBookings(prev => prev.map(b => b.id === bookingId ? { ...b, status: 'Cancelled' } : b));
-    showToast('Reservation cancelled successfully', 'info');
+  const handleCancelBooking = async (bookingId) => {
+    try {
+      await api.bookings.cancel(bookingId);
+      setBookings(prev => prev.map(b => b.id === bookingId ? { ...b, status: 'Cancelled' } : b));
+      showToast('Reservation cancelled successfully on backend', 'info');
+    } catch (err) {
+      console.warn('Backend cancel fallback:', err);
+      setBookings(prev => prev.map(b => b.id === bookingId ? { ...b, status: 'Cancelled' } : b));
+      showToast('Reservation cancelled successfully', 'info');
+    }
   };
 
   const favoriteVenues = venues.filter(v => userFavorites.includes(v.id));
@@ -21,7 +37,7 @@ export default function CustomerDashboard({ bookings, setBookings, venues, userF
       <div className="dashboard-header">
         <div className="dashboard-title-wrap">
           <h1>Customer Portal</h1>
-          <p>Manage your Zimbabwean event venue reservations and saved favorites</p>
+          <p>Welcome, <strong style={{ color: 'var(--accent-gold)' }}>{currentUser?.name || currentUser?.username || 'Customer'}</strong>. Manage your Zimbabwean event venue reservations and saved favorites.</p>
         </div>
 
         <button className="btn-primary" onClick={() => navigateTo('venues')}>
@@ -93,7 +109,14 @@ export default function CustomerDashboard({ bookings, setBookings, venues, userF
               </tr>
             </thead>
             <tbody>
-              {customerBookings.map(b => (
+              {customerBookings.length === 0 ? (
+                <tr>
+                  <td colSpan="6" style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--text-secondary)' }}>
+                    You have not made any bookings yet. Click <strong style={{ color: 'var(--accent-gold)' }}>Browse Venues</strong> to find and reserve an event space in Zimbabwe!
+                  </td>
+                </tr>
+              ) : (
+                customerBookings.map(b => (
                 <tr key={b.id}>
                   <td>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
@@ -148,7 +171,8 @@ export default function CustomerDashboard({ bookings, setBookings, venues, userF
                     </div>
                   </td>
                 </tr>
-              ))}
+              )))
+            }
             </tbody>
           </table>
         </div>

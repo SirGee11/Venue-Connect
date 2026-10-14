@@ -10,7 +10,9 @@ export default function BookingCard({ venue, onInitiateBooking }) {
   const [guestCount, setGuestCount] = useState(150);
   const [eventType, setEventType] = useState('Weddings');
 
-  const basePrice = venue.pricePerDay;
+  // The API returns decimals as strings (e.g. "600.00"), so convert to a number
+  // first. Otherwise "600.00" + 60 becomes the text "600.0060".
+  const basePrice = Number(venue.pricePerDay) || 0;
   const serviceFee = Math.round(basePrice * 0.1);
   const grandTotal = basePrice + serviceFee;
 

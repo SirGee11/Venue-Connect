@@ -5,8 +5,25 @@ export const ZIMBABWE_CITIES = [
   'Mutare',
   'Masvingo',
   'Victoria Falls',
-  'Kwekwe'
+  'Kwekwe',
+  'Chinhoyi',
+  'Bindura',
+  'Marondera',
+  'Beitbridge',
+  'Kariba',
+  'Gwanda',
+  'Rusape',
+  'Hwange',
+  'Zvishavane',
+  'Chegutu',
+  'Kadoma',
+  'Chiredzi'
 ];
+
+export const getCitiesList = (venuesList = []) => {
+  const dynamicCities = (venuesList || []).map(v => v.location).filter(Boolean);
+  return Array.from(new Set([...ZIMBABWE_CITIES, ...dynamicCities])).sort();
+};
 
 export const CATEGORIES = [
   { id: 'weddings', name: 'Wedding Venues', icon: 'Heart', description: 'Romantic estates, gardens, and luxury ballrooms' },

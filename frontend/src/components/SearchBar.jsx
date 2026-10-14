@@ -1,8 +1,10 @@
 import React from 'react';
-import { Search, MapPin, Calendar, DollarSign, Tag } from 'lucide-react';
-import { ZIMBABWE_CITIES, EVENT_TYPES } from '../data/mockData';
+import { Search, MapPin, Tag } from 'lucide-react';
+import { ZIMBABWE_CITIES, EVENT_TYPES, getCitiesList } from '../data/mockData';
 
-export default function SearchBar({ searchParams, setSearchParams, onSearchSubmit }) {
+export default function SearchBar({ searchParams, setSearchParams, onSearchSubmit, venues = [] }) {
+  const cities = getCitiesList(venues);
+
   return (
     <form
       className="search-bar-container"
@@ -17,17 +19,18 @@ export default function SearchBar({ searchParams, setSearchParams, onSearchSubmi
           <label>City / Location (Zimbabwe)</label>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <MapPin size={16} color="var(--accent-gold)" />
-            <select
+            <input
+              type="text"
+              list="search-cities-list"
+              placeholder="All Cities or type city..."
               value={searchParams.location || ''}
               onChange={(e) => setSearchParams({ ...searchParams, location: e.target.value })}
-            >
-              <option value="">All Locations in Zimbabwe</option>
-              {ZIMBABWE_CITIES.map((city) => (
-                <option key={city} value={city}>
-                  {city}
-                </option>
+            />
+            <datalist id="search-cities-list">
+              {cities.map((city) => (
+                <option key={city} value={city} />
               ))}
-            </select>
+            </datalist>
           </div>
         </div>
 

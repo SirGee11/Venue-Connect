@@ -1,31 +1,68 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { INITIAL_USERS } from '../data/mockData';
 import { Shield, Building2, Users, DollarSign, Check, ShieldAlert, Zap } from 'lucide-react';
+import { api } from '../services/api';
 import '../styles/dashboards.css';
 
-export default function AdminDashboard({ venues, setVenues, bookings, showToast }) {
+export default function AdminDashboard({ venues, setVenues, bookings, showToast, currentUser }) {
   const [users, setUsers] = useState(INITIAL_USERS);
   const [activeTab, setActiveTab] = useState('venues');
 
-  const handleApproveVenue = (venueId) => {
-    setVenues(prev => prev.map(v => v.id === venueId ? { ...v, status: 'approved' } : v));
-    showToast('Venue listing verified and published', 'success');
-  };
-
-  const handleSuspendVenue = (venueId) => {
-    setVenues(prev => prev.map(v => v.id === venueId ? { ...v, status: 'suspended' } : v));
-    showToast('Venue listing suspended', 'info');
-  };
-
-  const handleToggleUserStatus = (userId) => {
-    setUsers(prev => prev.map(u => {
-      if (u.id === userId) {
-        const nextStatus = u.status === 'Active' ? 'Suspended' : 'Active';
-        showToast(`User ${u.name} set to ${nextStatus}`, 'info');
-        return { ...u, status: nextStatus };
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const backendUsers = await api.users.getAll();
+        if (Array.isArray(backendUsers) && backendUsers.length > 0) {
+          setUsers(backendUsers);
+        }
+      } catch (err) {
+        console.warn('Backend users fetch fallback:', err);
       }
-      return u;
-    }));
+    };
+    fetchUsers();
+  }, []);
+
+  const handleApproveVenue = async (venueId) => {
+    try {
+      await api.venues.approve(venueId);
+      setVenues(prev => prev.map(v => v.id === venueId ? { ...v, status: 'approved' } : v));
+      showToast('Venue listing verified and approved in database', 'success');
+    } catch (err) {
+      console.warn('Backend approve fallback:', err);
+      setVenues(prev => prev.map(v => v.id === venueId ? { ...v, status: 'approved' } : v));
+      showToast('Venue listing verified and published', 'success');
+    }
+  };
+
+  const handleSuspendVenue = async (venueId) => {
+    try {
+      await api.venues.suspend(venueId);
+      setVenues(prev => prev.map(v => v.id === venueId ? { ...v, status: 'suspended' } : v));
+      showToast('Venue listing suspended in database', 'info');
+    } catch (err) {
+      console.warn('Backend suspend fallback:', err);
+      setVenues(prev => prev.map(v => v.id === venueId ? { ...v, status: 'suspended' } : v));
+      showToast('Venue listing suspended', 'info');
+    }
+  };
+
+  const handleToggleUserStatus = async (userId) => {
+    try {
+      const res = await api.users.toggleStatus(userId);
+      const nextStatus = res.status;
+      setUsers(prev => prev.map(u => u.id === userId ? { ...u, status: nextStatus } : u));
+      showToast(`User status updated to ${nextStatus}`, 'info');
+    } catch (err) {
+      console.warn('Backend toggle status fallback:', err);
+      setUsers(prev => prev.map(u => {
+        if (u.id === userId) {
+          const nextStatus = u.status === 'Active' ? 'Suspended' : 'Active';
+          showToast(`User ${u.name} set to ${nextStatus}`, 'info');
+          return { ...u, status: nextStatus };
+        }
+        return u;
+      }));
+    }
   };
 
   const platformRevenue = Math.round(

@@ -90,6 +90,7 @@ export default function Venues({ venues, onSelectVenue, searchParams, setSearchP
           searchParams={searchParams}
           setSearchParams={setSearchParams}
           onSearchSubmit={() => {}}
+          venues={venues}
         />
       </div>
 
@@ -128,6 +129,7 @@ export default function Venues({ venues, onSelectVenue, searchParams, setSearchP
             filters={{ ...filters, city: filters.city || searchParams.location, category: filters.category || searchParams.category }}
             setFilters={setFilters}
             resetFilters={resetFilters}
+            venues={venues}
           />
 
           {/* Listings Content */}

@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { Sparkles, MapPin, Users, DollarSign, Tag, Zap, Check, ArrowRight, Bot } from 'lucide-react';
-import { ZIMBABWE_CITIES, EVENT_TYPES, AMENITIES_LIST } from '../data/mockData';
+import { ZIMBABWE_CITIES, EVENT_TYPES, AMENITIES_LIST, getCitiesList } from '../data/mockData';
 import VenueCard from './VenueCard';
+import { api } from '../services/api';
 
 export default function AiVenueFinder({ venues, onSelectVenue, userFavorites, onToggleFavorite }) {
+  const cities = getCitiesList(venues);
   const [location, setLocation] = useState('Bulawayo');
   const [eventType, setEventType] = useState('Weddings');
   const [guestCount, setGuestCount] = useState(200);
@@ -34,12 +36,34 @@ export default function AiVenueFinder({ venues, onSelectVenue, userFavorites, on
     );
   };
 
-  const handleRunAiRecommendation = (e) => {
+  const handleRunAiRecommendation = async (e) => {
     e.preventDefault();
     setIsSearching(true);
 
+    try {
+      const results = await api.venues.getRecommendations({
+        location,
+        guest_count: guestCount,
+        max_budget: maxBudget,
+        facilities: selectedFacilities
+      });
+
+      if (Array.isArray(results) && results.length > 0) {
+        const top = results[0];
+        setAiMatchResult({
+          venue: top.venue,
+          matchPercentage: top.matchPercentage || 92,
+          rationale: top.naturalExplanation || top.rationale || `Top recommended Zimbabwean event match for ${location}.`
+        });
+        setIsSearching(false);
+        return;
+      }
+    } catch (err) {
+      console.warn('Backend recommendation fallback:', err);
+    }
+
+    // Client-side fallback calculation
     setTimeout(() => {
-      // AI Scoring Algorithm
       let bestMatch = null;
       let highestScore = -1;
       let bestRationale = '';
@@ -106,20 +130,13 @@ export default function AiVenueFinder({ venues, onSelectVenue, userFavorites, on
       {/* Decorative Badge */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-          <div style={{ width: '42px', height: '42px', borderRadius: 'var(--radius-md)', background: 'var(--accent-gold-gradient)', color: '#090d16', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Bot size={24} />
-          </div>
+
           <div>
             <h3 style={{ fontSize: '1.35rem', fontWeight: 700 }}>AI Smart Venue Assistant</h3>
             <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Intelligent recommendation engine for events in Zimbabwe</p>
           </div>
         </div>
-
-        <span className="badge badge-gold" style={{ padding: '0.4rem 0.9rem' }}>
-          <Sparkles size={13} /> Powered by Natural AI Scoring
-        </span>
       </div>
-
       {/* Input Criteria Form */}
       <form onSubmit={handleRunAiRecommendation} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.25rem', marginBottom: '1.5rem' }}>
         {/* Location */}
@@ -127,15 +144,19 @@ export default function AiVenueFinder({ venues, onSelectVenue, userFavorites, on
           <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Location (City)</label>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'var(--bg-input)', padding: '0.5rem 0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
             <MapPin size={16} color="var(--accent-gold)" />
-            <select
+            <input
+              type="text"
+              list="ai-cities-list"
               value={location}
+              placeholder="e.g. Bulawayo, Harare or type city"
               onChange={(e) => setLocation(e.target.value)}
               style={{ background: 'transparent', border: 'none', color: 'var(--text-primary)', width: '100%', outline: 'none' }}
-            >
-              {ZIMBABWE_CITIES.map(city => (
-                <option key={city} value={city} style={{ background: 'var(--bg-secondary)' }}>{city}</option>
+            />
+            <datalist id="ai-cities-list">
+              {cities.map(city => (
+                <option key={city} value={city} />
               ))}
-            </select>
+            </datalist>
           </div>
         </div>
 
@@ -221,7 +242,7 @@ export default function AiVenueFinder({ venues, onSelectVenue, userFavorites, on
         onClick={handleRunAiRecommendation}
         disabled={isSearching}
       >
-        <Sparkles size={18} /> {isSearching ? 'Calculating AI Recommendation...' : 'Generate AI Recommendation Match'}
+        {isSearching ? 'Calculating AI Recommendation...' : 'Generate AI Recommendation Match'}
       </button>
 
       {/* AI Recommendation Result Card Output */}

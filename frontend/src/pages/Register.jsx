@@ -1,22 +1,44 @@
 import React, { useState } from 'react';
-import { User, Mail, Lock, Phone, UserPlus } from 'lucide-react';
+import { User, Mail, Lock, Phone, UserPlus, Loader2 } from 'lucide-react';
+import { api } from '../services/api';
 import '../styles/auth.css';
 
-export default function Register({ navigateTo, setRole, showToast }) {
+export default function Register({ navigateTo, setRole, setCurrentUser, showToast }) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('+263 77 123 4567');
   const [password, setPassword] = useState('');
   const [selectedRole, setSelectedRole] = useState('customer');
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    setRole(selectedRole);
-    showToast(`Account created successfully! Logged in as ${selectedRole.toUpperCase()}`, 'success');
+    setIsLoading(true);
 
-    if (selectedRole === 'customer') navigateTo('customer-dashboard');
-    else if (selectedRole === 'owner') navigateTo('owner-dashboard');
-    else navigateTo('admin-dashboard');
+    try {
+      const res = await api.auth.register({
+        name,
+        email,
+        phone,
+        password,
+        role: selectedRole
+      });
+
+      const activeUser = res.user;
+      if (setCurrentUser) setCurrentUser(activeUser);
+      if (setRole) setRole(selectedRole);
+
+      showToast(`Account created successfully! Welcome to VenueConnect, ${name}.`, 'success');
+
+      if (selectedRole === 'customer') navigateTo('customer-dashboard', activeUser);
+      else if (selectedRole === 'owner') navigateTo('owner-dashboard', activeUser);
+      else navigateTo('admin-dashboard', activeUser);
+    } catch (err) {
+      console.error('Registration failed:', err);
+      showToast(err.message || 'Could not create account', 'error');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
