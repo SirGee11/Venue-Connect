@@ -230,3 +230,4 @@ All demo accounts have password: **`password123`**
 | **Venue Owner** | `farai` | `farai@venueowner.co.zw` | List new venues, approve/decline booking requests |
 | **Administrator** | `blessing` | `admin@venueconnect.co.zw` | Moderation: verify venues, suspend venues, manage users |
 # Venue-Connect
+# Venue-Connect1
